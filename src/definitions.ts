@@ -95,6 +95,14 @@ export interface AppMetricaPlugin {
    * @param userProfile 
    */
   reportUserProfile(userProfile: YAMUserProfile): Promise<void>;
+
+  /**
+   * Запрос отложенного диплинка (Deferred Deep Link).
+   * Вызывать при первом запуске после установки из Store.
+   * На Android использует Google Play Install Referrer; на iOS — см. документацию AppMetrica.
+   * @returns { url: string | null } при успехе (url — ссылка или null), при ошибке — { url: null, error?: string }
+   */
+  requestDeferredDeeplink(): Promise<{ url: string | null; error?: string }>;
 }
 
 //#region Share App Merika

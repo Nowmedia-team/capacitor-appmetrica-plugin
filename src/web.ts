@@ -66,6 +66,11 @@ export class AppMetricaWeb extends WebPlugin implements AppMetricaPlugin {
   async reportUserProfile(userProfile: YAMUserProfile): Promise<void> {
     this.log('AppMetrica: Web not supported. [reportUserProfile()]', userProfile);
   }
+
+  async requestDeferredDeeplink(): Promise<{ url: string | null; error?: string }> {
+    this.log('AppMetrica: Web not supported. [requestDeferredDeeplink()]');
+    return { url: null, error: 'not_supported_on_web' };
+  }
 }
 
 const AppMetrica = new AppMetricaWeb();

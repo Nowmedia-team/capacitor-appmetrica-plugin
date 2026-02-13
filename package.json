@@ -17,10 +17,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/virusv/capacitor-appmetrica-plugin.git"
+    "url": "git+https://github.com/Nowmedia-team/capacitor-appmetrica-plugin.git"
   },
   "bugs": {
-    "url": "https://github.com/virusv/capacitor-appmetrica-plugin/issues"
+    "url": "https://github.com/Nowmedia-team/capacitor-appmetrica-plugin/issues"
   },
   "keywords": [
     "capacitor",

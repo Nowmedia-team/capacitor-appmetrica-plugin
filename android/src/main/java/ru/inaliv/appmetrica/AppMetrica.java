@@ -10,6 +10,7 @@ import com.getcapacitor.*;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import io.appmetrica.analytics.AppMetricaConfig;
+import io.appmetrica.analytics.DeferredDeeplinkListener;
 import io.appmetrica.analytics.ecommerce.*;
 import io.appmetrica.analytics.profile.UserProfile;
 
@@ -20,8 +21,12 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import org.json.JSONException;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @CapacitorPlugin(name = "AppMetrica")
 public class AppMetrica extends Plugin {
@@ -324,6 +329,70 @@ public class AppMetrica extends Plugin {
         } catch (JSONException e) {
             call.reject(e.getMessage());
         }
+    }
+
+    /**
+     * Запрос отложенного диплинка (Deferred Deep Link). Вызывать при первом запуске после установки из Store.
+     * На Android использует Google Play Install Referrer.
+     *
+     * @param call
+     */
+    /** Таймаут ожидания ответа от SDK для deferred deeplink (мс). */
+    private static final long DEFERRED_DEEPLINK_TIMEOUT_MS = 10_000;
+
+    @PluginMethod
+    public void requestDeferredDeeplink(final PluginCall call) {
+        final AtomicBoolean resolved = new AtomicBoolean(false);
+        final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+
+        // Таймаут: если SDK не ответит за DEFERRED_DEEPLINK_TIMEOUT_MS — возвращаем null + error
+        final Runnable timeoutRunnable = () -> {
+            if (resolved.compareAndSet(false, true)) {
+                final JSObject result = new JSObject();
+                result.put("url", (String) null);
+                result.put("error", "timeout");
+                call.resolve(result);
+            }
+        };
+        handler.postDelayed(timeoutRunnable, DEFERRED_DEEPLINK_TIMEOUT_MS);
+
+        try {
+            io.appmetrica.analytics.AppMetrica.requestDeferredDeeplink(new DeferredDeeplinkListener() {
+                @Override
+                public void onDeeplinkLoaded(@NonNull String deeplink) {
+                    if (resolved.compareAndSet(false, true)) {
+                        handler.removeCallbacks(timeoutRunnable);
+                        final JSObject result = new JSObject();
+                        result.put("url", deeplink);
+                        runOnMainThread(() -> call.resolve(result));
+                    }
+                }
+
+                @Override
+                public void onError(@NonNull DeferredDeeplinkListener.Error error, @Nullable String referrer) {
+                    if (resolved.compareAndSet(false, true)) {
+                        handler.removeCallbacks(timeoutRunnable);
+                        final JSObject result = new JSObject();
+                        result.put("url", (String) null);
+                        result.put("error", error.getDescription());
+                        runOnMainThread(() -> call.resolve(result));
+                    }
+                }
+            });
+        } catch (Exception e) {
+            if (resolved.compareAndSet(false, true)) {
+                handler.removeCallbacks(timeoutRunnable);
+                final JSObject result = new JSObject();
+                result.put("url", (String) null);
+                result.put("error", e.getMessage() != null ? e.getMessage() : "unknown_error");
+                call.resolve(result);
+            }
+        }
+    }
+
+    private void runOnMainThread(Runnable runnable) {
+        android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+        handler.post(runnable);
     }
 
     //-------------------- SERVICES -------------------------------------------
