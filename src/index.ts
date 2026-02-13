@@ -8,3 +8,4 @@ const AppMetrica = registerPlugin<AppMetricaPlugin>('AppMetrica', {
 
 export * from './definitions';
 export { AppMetrica };
+export type { AppMetricaPlugin };

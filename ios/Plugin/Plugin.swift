@@ -288,4 +288,12 @@ public class AppMetricaPlugin: CAPPlugin {
             call.reject("Undefined Error")
         }
     }
+    
+    /**
+     * Запрос отложенного диплинка (Deferred Deep Link).
+     * На iOS в текущей версии AppMetrica SDK публичного API для отложенного диплинка нет — возвращаем url: null.
+     */
+    @objc func requestDeferredDeeplink(_ call: CAPPluginCall) {
+        call.resolve(["url": NSNull(), "error": "not_supported_on_ios"])
+    }
 }
