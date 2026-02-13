@@ -1,5 +1,5 @@
 {
-  "name": "capacitor-appmetrica-plugin",
+  "name": "@nowmedia-team/capacitor-appmetrica-plugin",
   "version": "8.0.0",
   "description": "Yandex App metrica plugin for Capacitor",
   "main": "dist/plugin.cjs.js",
