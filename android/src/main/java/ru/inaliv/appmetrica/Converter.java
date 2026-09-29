@@ -12,7 +12,10 @@ import io.appmetrica.analytics.ecommerce.ECommerceProduct;
 import io.appmetrica.analytics.ecommerce.ECommerceReferrer;
 import io.appmetrica.analytics.ecommerce.ECommerceScreen;
 import io.appmetrica.analytics.profile.Attribute;
+import io.appmetrica.analytics.profile.BooleanAttribute;
 import io.appmetrica.analytics.profile.GenderAttribute;
+import io.appmetrica.analytics.profile.NumberAttribute;
+import io.appmetrica.analytics.profile.StringAttribute;
 import io.appmetrica.analytics.profile.UserProfile;
 import io.appmetrica.analytics.profile.UserProfileUpdate;
 
@@ -434,6 +437,10 @@ public class Converter {
      *     "year": 2001,
      *     "month": 1,
      *      "day": 1
+     *   },
+     *   "custom": { // пользовательские атрибуты, до 100 штук
+     *     "country": "RU",
+     *     "visits": { "type": "counter", "delta": 1 }
      *   }
      * }
      *
@@ -493,7 +500,117 @@ public class Converter {
             }
         }
 
+        if (user.has("custom")) {
+            applyCustomAttributes(yamProfileBuilder, user.getJSONObject("custom"));
+        }
+
         return yamProfileBuilder.build();
+    }
+
+    /**
+     * Применяет пользовательские (кастомные) атрибуты профиля.
+     *
+     * Короткая форма — тип выводится из значения JSON:
+     * { "country": "RU", "visits": 10, "isPaid": true }
+     *
+     * Развёрнутая форма — с явным типом и режимом записи:
+     * {
+     *   "country": { "type": "string", "value": "RU" },
+     *   "visits":  { "type": "counter", "delta": 1 },
+     *   "rating":  { "type": "number", "value": 4.5, "ifUndefined": true },
+     *   "oldTag":  { "type": "string", "reset": true }
+     * }
+     *
+     * @param builder
+     * @param custom
+     * @throws JSONException
+     */
+    private static void applyCustomAttributes(
+        final UserProfile.Builder builder,
+        final JSONObject custom
+    ) throws JSONException {
+        Iterator<String> keys = custom.keys();
+
+        while (keys.hasNext()) {
+            final String key = keys.next();
+            final Object raw = custom.get(key);
+
+            if (raw == JSONObject.NULL) {
+                continue;
+            }
+
+            if (raw instanceof JSONObject) {
+                applyCustomAttribute(builder, key, (JSONObject) raw);
+                continue;
+            }
+
+            // Короткая форма: тип определяется по значению
+            if (raw instanceof Boolean) {
+                builder.apply(Attribute.customBoolean(key).withValue((Boolean) raw));
+            } else if (raw instanceof Number) {
+                builder.apply(Attribute.customNumber(key).withValue(((Number) raw).doubleValue()));
+            } else {
+                builder.apply(Attribute.customString(key).withValue(raw.toString()));
+            }
+        }
+    }
+
+    /**
+     * Применяет один кастомный атрибут, заданный в развёрнутой форме.
+     *
+     * @param builder
+     * @param key
+     * @param attr
+     * @throws JSONException
+     */
+    private static void applyCustomAttribute(
+        final UserProfile.Builder builder,
+        final String key,
+        final JSONObject attr
+    ) throws JSONException {
+        final String type = attr.optString("type", "string").toLowerCase(Locale.ROOT);
+        final boolean reset = attr.optBoolean("reset", false);
+        final boolean ifUndefined = attr.optBoolean("ifUndefined", false);
+
+        switch (type) {
+            case "counter" -> {
+                // У счётчика нет withValue/withValueReset — только приращение
+                builder.apply(Attribute.customCounter(key).withDelta(attr.optDouble("delta", 0)));
+            }
+            case "number" -> {
+                NumberAttribute number = Attribute.customNumber(key);
+
+                if (reset) {
+                    builder.apply(number.withValueReset());
+                } else if (ifUndefined) {
+                    builder.apply(number.withValueIfUndefined(attr.getDouble("value")));
+                } else {
+                    builder.apply(number.withValue(attr.getDouble("value")));
+                }
+            }
+            case "boolean", "bool" -> {
+                BooleanAttribute bool = Attribute.customBoolean(key);
+
+                if (reset) {
+                    builder.apply(bool.withValueReset());
+                } else if (ifUndefined) {
+                    builder.apply(bool.withValueIfUndefined(attr.getBoolean("value")));
+                } else {
+                    builder.apply(bool.withValue(attr.getBoolean("value")));
+                }
+            }
+            default -> {
+                StringAttribute string = Attribute.customString(key);
+
+                if (reset) {
+                    builder.apply(string.withValueReset());
+                } else if (ifUndefined) {
+                    builder.apply(string.withValueIfUndefined(attr.getString("value")));
+                } else {
+                    builder.apply(string.withValue(attr.getString("value")));
+                }
+            }
+        }
     }
 
     private static GenderAttribute.Gender toGenderType(final String gender) {

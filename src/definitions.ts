@@ -425,10 +425,38 @@ export interface YAMUserProfileId {
   id: string;
 }
 
+/**
+ * Пользовательский (кастомный) атрибут профиля в развёрнутой форме.
+ *
+ * - `reset` — сбросить значение атрибута;
+ * - `ifUndefined` — записать, только если значение ещё не задано;
+ * - у `counter` доступно лишь приращение `delta`.
+ */
+export type YAMCustomAttribute =
+  | { type: 'string'; value: string; ifUndefined?: boolean }
+  | { type: 'string'; reset: true }
+  | { type: 'number'; value: number; ifUndefined?: boolean }
+  | { type: 'number'; reset: true }
+  | { type: 'boolean'; value: boolean; ifUndefined?: boolean }
+  | { type: 'boolean'; reset: true }
+  | { type: 'counter'; delta: number };
+
 export interface YAMUserProfile {
   name?: string;
   gender?: YAMGenderType;
   notificationEnabled?: boolean;
   birthDate?: YAMUserProfileBirthDate|YAMUserProfileAge;
+  /**
+   * Пользовательские атрибуты профиля. Допустимо до 100 атрибутов на приложение.
+   *
+   * Короткая форма — тип выводится из значения:
+   * `{ country: 'RU', visits: 10, isPaid: true }`
+   *
+   * Развёрнутая форма — с явным типом и режимом записи:
+   * `{ visits: { type: 'counter', delta: 1 } }`
+   *
+   * @see https://appmetrica.yandex.ru/docs/ru/data-collection/profile-attributes.html
+   */
+  custom?: Record<string, string|number|boolean|YAMCustomAttribute>;
 }
 //#endregion

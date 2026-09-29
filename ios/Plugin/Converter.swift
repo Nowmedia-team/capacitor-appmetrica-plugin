@@ -365,8 +365,102 @@ class Converter {
         if let notificationEnabled = user["notificationEnabled"] as? Bool {
             yamProfile.apply(ProfileAttribute.notificationsEnabled().withValue(notificationEnabled))
         }
-        
+
+        if let custom = user["custom"] as? [AnyHashable: Any] {
+            applyCustomAttributes(profile: yamProfile, custom: custom)
+        }
+
         return yamProfile
+    }
+
+    /**
+     * Применяет пользовательские (кастомные) атрибуты профиля.
+     *
+     * Короткая форма — тип выводится из значения:
+     * { "country": "RU", "visits": 10, "isPaid": true }
+     *
+     * Развёрнутая форма — с явным типом и режимом записи:
+     * {
+     *   "country": { "type": "string", "value": "RU" },
+     *   "visits":  { "type": "counter", "delta": 1 },
+     *   "rating":  { "type": "number", "value": 4.5, "ifUndefined": true },
+     *   "oldTag":  { "type": "string", "reset": true }
+     * }
+     */
+    static func applyCustomAttributes(profile: MutableUserProfile, custom: [AnyHashable: Any]) {
+        for (rawKey, rawValue) in custom {
+            guard let key = rawKey as? String else {
+                continue
+            }
+
+            if let attr = rawValue as? [AnyHashable: Any] {
+                applyCustomAttribute(profile: profile, key: key, attr: attr)
+                continue
+            }
+
+            // Короткая форма: тип определяется по значению.
+            // NSNumber покрывает и Bool, поэтому проверяем его первым.
+            if let bool = rawValue as? Bool {
+                profile.apply(ProfileAttribute.customBool(key).withValue(bool))
+            } else if let number = rawValue as? NSNumber {
+                profile.apply(ProfileAttribute.customNumber(key).withValue(number.doubleValue))
+            } else if let string = rawValue as? String {
+                profile.apply(ProfileAttribute.customString(key).withValue(string))
+            }
+        }
+    }
+
+    /**
+     * Применяет один кастомный атрибут, заданный в развёрнутой форме.
+     */
+    static func applyCustomAttribute(
+        profile: MutableUserProfile,
+        key: String,
+        attr: [AnyHashable: Any]
+    ) {
+        let type = (attr["type"] as? String ?? "string").lowercased()
+        let reset = attr["reset"] as? Bool ?? false
+        let ifUndefined = attr["ifUndefined"] as? Bool ?? false
+
+        switch type {
+        case "counter":
+            // У счётчика нет withValue/withValueReset — только приращение
+            let delta = (attr["delta"] as? NSNumber)?.doubleValue ?? 0
+            profile.apply(ProfileAttribute.customCounter(key).withDelta(delta))
+
+        case "number":
+            let attribute = ProfileAttribute.customNumber(key)
+
+            if reset {
+                profile.apply(attribute.withValueReset())
+            } else if let value = (attr["value"] as? NSNumber)?.doubleValue {
+                profile.apply(ifUndefined
+                    ? attribute.withValueIfUndefined(value)
+                    : attribute.withValue(value))
+            }
+
+        case "boolean", "bool":
+            let attribute = ProfileAttribute.customBool(key)
+
+            if reset {
+                profile.apply(attribute.withValueReset())
+            } else if let value = attr["value"] as? Bool {
+                profile.apply(ifUndefined
+                    ? attribute.withValueIfUndefined(value)
+                    : attribute.withValue(value))
+            }
+
+        default:
+            let attribute = ProfileAttribute.customString(key)
+
+            if reset {
+                profile.apply(attribute.withValueReset())
+            } else if let value = attr["value"] as? String {
+                profile.apply(ifUndefined
+                    ? attribute.withValueIfUndefined(value)
+                    : attribute.withValue(value))
+            }
+        }
     }
     
     static func toGenderType(_ gender: String) -> GenderType {
